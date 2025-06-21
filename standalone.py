@@ -2,6 +2,9 @@ from allennlp.predictors import Predictor
 from allennlp.models.archival import load_archive
 from allennlp.common.util import import_submodules, JsonDict, sanitize
 import argparse
+
+from nltk.misc.chomsky import subjects
+
 import_submodules('imojie')
 
 def process(token_ids):
@@ -21,11 +24,12 @@ def process(token_ids):
             ans.append(x)
     return ans
 
-def main(args):
+def main(args, allennlp=True):
     archive = load_archive(
         "models/imojie",
         weights_file="models/imojie/model_state_epoch_7.th",
-        cuda_device=-1)
+        cuda_device=-1,
+    )
 
     predictor = Predictor.from_archive(archive, "noie_seq2seq")
     out = open(args.out, 'w')
@@ -36,11 +40,21 @@ def main(args):
         input_instances.append(instance)
         sentences.append(line)
     output_instances = predictor._model.forward_on_instances(input_instances)
-    for output in output_instances:
-        output = sanitize(output)
-        output = process(output["predicted_tokens"][0])
-        out.write(line)
-        out.write('\n'.join(output)+'\n\n')
+    for i, output in enumerate(output_instances):
+        san_output = sanitize(output)
+        proc_output = process(san_output["predicted_tokens"][0])
+        if allennlp:
+            for j in range(len(proc_output)):
+                triple_elements = proc_output[j].strip()[1:-1].split(";")
+                assert len(triple_elements) == 3
+                arg1 = triple_elements[0]
+                relation = triple_elements[1]
+                srg2 = triple_elements[2]
+                confidence = san_output["predicted_log_probs"][j]
+                out.write(f"{sentences[i].strip()}\t<arg1> {arg1} </arg1> <rel> {relation} </rel> <arg2> {srg2} </arg2>\t{confidence}\n")
+        else:
+            out.write(sentences[i].strip()+"\n")
+            out.write('\n'.join(proc_output)+'\n\n')
     out.close()
 
 if __name__ == "__main__":
