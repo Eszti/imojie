@@ -46,10 +46,12 @@ def main(args, allennlp=True):
         if allennlp:
             for j in range(len(proc_output)):
                 triple_elements = proc_output[j].strip()[1:-1].split(";")
-                assert len(triple_elements) == 3
+                if len(triple_elements) < 2:
+                    continue
                 arg1 = triple_elements[0]
                 relation = triple_elements[1]
-                srg2 = triple_elements[2]
+                if len(triple_elements) > 2:
+                    srg2 = ' '.join(triple_elements[2:])
                 confidence = san_output["predicted_log_probs"][j]
                 out.write(f"{sentences[i].strip()}\t<arg1> {arg1} </arg1> <rel> {relation} </rel> <arg2> {srg2} </arg2>\t{confidence}\n")
         else:
